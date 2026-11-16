@@ -260,3 +260,21 @@ def test_the_example_family_still_runs_when_passed_explicitly(tmp_path: Path) ->
     sample.write_bytes(FIXTURE)
     spectrum = analyze_path(sample, modules=[StaticModule(), ExampleFamilyModule()])
     assert spectrum.summary.family is not None and spectrum.summary.family.name == "example"
+
+
+def test_a_spectrum_over_the_noctornal_cap_is_not_sent() -> None:
+    from maasspec.ingest.noctornal import MAX_SPECTRUM_BYTES, IngestError
+
+    spectrum = Spectrum.model_validate_json(
+        (Path(__file__).parent.parent / "examples" / "fixture.spectrum.json").read_bytes())
+    spectrum.metadata = {"pad": "x" * (MAX_SPECTRUM_BYTES + 1)}
+    calls: list[object] = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        raise AssertionError("nothing may be sent")
+
+    client = IngestClient("http://127.0.0.1:9", "noct_sk_test_" + "a" * 32)
+    with pytest.raises(IngestError):
+        client.submit_spectrum(spectrum, opener=opener)
+    assert calls == []

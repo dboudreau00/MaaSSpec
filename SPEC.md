@@ -114,6 +114,9 @@ switch off, which is the default, a spectrum waits in the queue as before. The
 parse step is a person's action in NocTORnal: MaaSSpec never calls the parse
 endpoint.
 
+A spectrum over 16 MiB of compact JSON is not sent: NocTORnal dead-letters it at parse. The largest
+spectra MaaSSpec makes, from a CAPE report, run to a few MiB.
+
 The `Idempotency-Key` is the `analysis_id`. Feed spectra are byte-stable, so a
 re-import is an identical body under the same key. `maasspec_version` is the
 contract version (`0.1.0`). It does not follow the package version; `tool.version`

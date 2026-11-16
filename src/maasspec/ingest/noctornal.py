@@ -15,6 +15,10 @@ from maasspec import net
 from maasspec.models import Spectrum
 
 INGEST_PATH = "/api/v1/ingest"
+#: NocTORnal refuses a spectrum over this many bytes of compact JSON when it parses the batch, so a larger one is
+#: not sent. The cap on what the client reads back is separate and much smaller.
+MAX_SPECTRUM_BYTES = 16 * 1024 * 1024
+RESPONSE_MAX_BYTES = 1024 * 1024
 INGEST_KEY = re.compile(r"noct_sk_(live|test)_[A-Za-z0-9]{32}")
 IngestError = net.HttpError
 Opener = net.Opener
@@ -73,6 +77,12 @@ class IngestClient:
         self.timeout = timeout
 
     def submit_spectrum(self, spectrum: Spectrum, opener: Opener | None = None) -> bytes:
+        body = spectrum_document(spectrum)
+        if len(body) > MAX_SPECTRUM_BYTES:
+            raise IngestError(
+                f"The spectrum is {len(body)} bytes. NocTORnal refuses a spectrum over "
+                f"{MAX_SPECTRUM_BYTES} bytes when it parses the batch, so it was not sent."
+            )
         return net.request(
             self.base_url + INGEST_PATH,
             allow_hosts={self.host},
@@ -82,9 +92,9 @@ class IngestClient:
                 "Idempotency-Key": str(spectrum.analysis_id),
                 "Content-Type": "application/json",
             },
-            body=spectrum_document(spectrum),
+            body=body,
             allow_loopback_http=True,
-            max_bytes=1024 * 1024,
+            max_bytes=RESPONSE_MAX_BYTES,
             timeout=self.timeout,
             opener=opener,
             error_body=True,
