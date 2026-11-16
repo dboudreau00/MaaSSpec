@@ -230,7 +230,7 @@ def _c2(raw: str, source: SourceRef) -> DraftFinding | None:
     parsed = _ip_port(value)
     if parsed is not None:
         ip, port = parsed
-        private = ip.is_private or ip.is_loopback
+        private = is_unroutable(str(ip))
         kind = "ipv4" if ip.version == 4 else "ipv6"
         selectors = [Selector(kind=kind, value=str(ip), normalized=str(ip))]
         if port is not None:

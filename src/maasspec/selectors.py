@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from urllib.parse import urlsplit
 
 from maasspec.models import DraftFinding, ProposedGrade, Selector
 
@@ -11,7 +12,6 @@ _URL = re.compile(r"https?://[^\s'\"<>]{4,200}", re.IGNORECASE)
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+\-]{1,64}@[A-Za-z0-9.\-]{1,253}\.[A-Za-z]{2,24}\b")
 _IPV4 = re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b")
 _BTC = re.compile(r"\bbc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{11,87}\b")
-_DOMAIN_IN_URL = re.compile(r"https?://([^/:]+)", re.IGNORECASE)
 
 MAX_SELECTOR_FINDINGS = 200
 
@@ -95,8 +95,11 @@ def _type_for(kind: str) -> str:
 
 def _normalize(kind: str, value: str) -> str:
     if kind == "url":
-        host = _DOMAIN_IN_URL.search(value)
-        return host.group(1).lower().rstrip(".") if host else value.lower()
+        try:
+            host = urlsplit(value).hostname
+        except ValueError:
+            host = None
+        return host.rstrip(".") if host else value.lower()
     if kind == "email":
         return value.lower()
     return value

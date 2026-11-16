@@ -20,6 +20,7 @@ from maasspec.feeds import base
 from maasspec.feeds.base import FeedAdapter, FeedFormatError, FetchOptions
 from maasspec.models import Artifact, DraftFinding, FamilySummary, Selector, SourceRef
 from maasspec.modules.base import ModuleOutput
+from maasspec.selectors import is_unroutable
 
 API_URL = "https://threatfox-api.abuse.ch/api/v1/"
 _ALIASES = {
@@ -231,7 +232,7 @@ def _ioc_finding(
             return None
         if not 1 <= number <= 65535:
             return None
-        private = ip.is_private or ip.is_loopback
+        private = is_unroutable(str(ip))
         kind = "ipv4" if ip.version == 4 else "ipv6"
         return DraftFinding(
             type="c2", subtype="ip_port", value=ioc, normalized=f"{ip}:{number}",
