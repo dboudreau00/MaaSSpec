@@ -339,3 +339,11 @@ def test_analyze_takes_a_report_up_to_the_engine_ceiling(app) -> None:
         f"X-MaaSSpec-Token: {TOKEN}\r\nConnection: close\r\n"
     )
     assert b"413" in raw(app, (head + f"Content-Length: {MAX_REPORT_BYTES + 1}\r\n\r\n").encode())
+
+
+def test_an_import_limit_above_what_the_session_keeps_is_refused(app) -> None:
+    from maasspec.serve import MAX_SPECTRA
+
+    body = json.dumps(TF).encode()
+    assert call(app, "POST", f"/api/import?feed=threatfox&limit={MAX_SPECTRA + 1}", body=body)[0] == 400
+    assert call(app, "POST", f"/api/import?feed=threatfox&limit={MAX_SPECTRA}", body=body)[0] == 200

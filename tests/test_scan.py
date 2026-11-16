@@ -48,3 +48,13 @@ def test_a_valid_zip_larger_than_the_scan_window_has_its_members_listed(tmp_path
     assert members[0] == "member_000.txt"
     assert not [e for e in spectrum.errors if "did not parse" in e.message]
     assert [e for e in spectrum.errors if "Listed 50 of 150" in e.message]
+
+
+def test_zip_members_with_drive_or_unc_names_are_skipped(tmp_path: Path) -> None:
+    path = tmp_path / "names.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        for name in ("ok.txt", "C:/Windows/x.dll", "d:evil.dll", r"\\srv\share\x","//srv/share/y", "a/../b"):
+            archive.writestr(zipfile.ZipInfo(name), b"x")
+    spectrum = analyze_path(path)
+    assert [f.value for f in spectrum.findings if f.subtype == "archive_member"] == ["ok.txt"]
+    assert len([e for e in spectrum.errors if "unsafe name" in e.message]) == 5

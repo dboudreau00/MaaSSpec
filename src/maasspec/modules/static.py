@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import zipfile
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from maasspec.scan import shannon_entropy
 from maasspec.selectors import selector_findings
 
 MAX_ZIP_MEMBERS = 200
+_DRIVE = re.compile(r"[A-Za-z]:")
 MAX_ZIP_UNCOMPRESSED = 64 * 1024 * 1024
 
 
@@ -101,6 +103,12 @@ def _magic(ctx: AnalysisContext) -> DraftFinding:
     )
 
 
+def _unsafe_member_name(name: str) -> bool:
+    """Rooted, drive-lettered, UNC and parent-relative names are skipped."""
+    normal = name.replace("\\", "/")
+    return normal.startswith("/") or _DRIVE.match(normal) is not None or ".." in normal.split("/")
+
+
 def _zip_members(path: Path) -> tuple[list[DraftFinding], list[AnalysisError]]:
     findings: list[DraftFinding] = []
     errors: list[AnalysisError] = []
@@ -133,7 +141,7 @@ def _zip_members(path: Path) -> tuple[list[DraftFinding], list[AnalysisError]]:
 
     for info in infos[:50]:
         name = info.filename
-        if name.startswith("/") or ".." in name.replace("\\", "/").split("/"):
+        if _unsafe_member_name(name):
             errors.append(
                 AnalysisError(
                     severity="warning",

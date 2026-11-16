@@ -208,3 +208,12 @@ def test_a_private_url_in_a_config_is_scored_as_private(tmp_path: Path) -> None:
         assert row.proposed_grade.information_credibility == "4"
     public = by_value["https://93.184.216.34/gate"]
     assert public.confidence == 0.6 and "scope:private" not in public.tags
+
+
+def test_two_fields_with_the_same_short_name_keep_separate_context(tmp_path: Path) -> None:
+    spectrum = _analyze(
+        tmp_path,
+        _config_report({"Primary": {"host": "a.example.test"}, "Backup": {"host": "b.example.test"}}),
+    )
+    config = next(f for f in spectrum.findings if f.subtype == "cape_parser_config")
+    assert sorted(config.context.values()) == ["a.example.test", "b.example.test"]

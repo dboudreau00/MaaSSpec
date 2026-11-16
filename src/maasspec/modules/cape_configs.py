@@ -140,7 +140,7 @@ def _config(out: ModuleOutput, entry: dict, index: int, seen: set[tuple[str, str
                 confidence_method="cape_parser",
                 technique="cape_config_parser",
                 source=source,
-                context={name: value for name, _, value in pairs[:MAX_CONTEXT]},
+                context=_context(pairs[:MAX_CONTEXT], family),
                 selectors=_hash_selectors(hashes),
                 proposed_grade=_PARSER_GRADE,
                 tags=TAGS,
@@ -169,6 +169,15 @@ def _config(out: ModuleOutput, entry: dict, index: int, seen: set[tuple[str, str
                 draft.tags = [*TAGS, "scope:private"] if private else list(TAGS)
                 draft.proposed_grade = _PRIVATE_GRADE if private else _PARSER_GRADE
                 out.findings.append(draft)
+
+
+def _context(pairs: list[tuple[str, str, str]], family: str) -> dict[str, str]:
+    """Field name to value. A name already taken is keyed by its path, so no value is lost."""
+    context: dict[str, str] = {}
+    for name, path, value in pairs:
+        key = name if name not in context else path.removeprefix(f"{family}.")
+        context[key] = value
+    return context
 
 
 def _classify(name: str, value: str, source: SourceRef) -> DraftFinding | None:

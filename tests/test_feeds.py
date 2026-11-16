@@ -429,3 +429,8 @@ def test_threatfox_md5_ioc_is_mapped_and_a_bad_hash_is_flagged() -> None:
     assert _kinds(good) == {("embedded_artifact", "sample_hash")} and good.errors == []
     assert _kinds(bad) == {("other", "md5_hash")}
     assert any("did not validate" in e.message for e in bad.errors)
+
+
+def test_malwarebazaar_data_list_without_a_status_is_read() -> None:
+    [spectrum] = _spectra(MalwareBazaarFeed(), {"data": MB_RESPONSE["data"]})
+    assert spectrum.metadata["claimed_sample_sha256"] == SHA_A
