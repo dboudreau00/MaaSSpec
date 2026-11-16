@@ -184,3 +184,52 @@ def test_schema_file_matches_models() -> None:
     path = Path(__file__).resolve().parents[1] / "schema" / "spectrum.schema.json"
     on_disk = json.loads(path.read_text(encoding="utf-8"))
     assert on_disk == spectrum_json_schema()
+
+
+def _cape_findings(tmp_path: Path, report: dict) -> Spectrum:
+    path = tmp_path / "report.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+    return analyze_path(path)
+
+
+def test_cape_network_to_a_private_address_is_scored_as_private(tmp_path: Path) -> None:
+    spectrum = _cape_findings(
+        tmp_path,
+        {
+            "network": {
+                "hosts": [{"ip": "10.0.0.1"}, {"ip": "198.51.100.7"}, {"ip": "203.0.114.9"}],
+                "http": [{"uri": "http://192.168.1.5/gate"}],
+            }
+        },
+    )
+    by_value = {item.value: item for item in spectrum.findings}
+    for value in ("10.0.0.1", "http://192.168.1.5/gate"):
+        row = by_value[value]
+        assert row.confidence == 0.35
+        assert "scope:private" in row.tags
+        assert (row.proposed_grade.source_reliability, row.proposed_grade.information_credibility) == ("C", "4")
+    public = by_value["203.0.114.9"]
+    assert public.confidence == 0.45
+    assert "scope:private" not in public.tags
+
+
+def test_cape_network_rows_are_capped_per_kind_with_an_error_row(tmp_path: Path) -> None:
+    hosts = [{"ip": f"203.0.{i // 250 + 114}.{i % 250 + 1}"} for i in range(450)]
+    dns = [{"request": f"d{i}.example.test"} for i in range(5)]
+    spectrum = _cape_findings(tmp_path, {"network": {"hosts": hosts, "dns": dns}})
+    ips = [f for f in spectrum.findings if f.subtype == "ipv4"]
+    assert len(ips) == 200
+    assert len([f for f in spectrum.findings if f.subtype == "domain"]) == 5
+    assert [e for e in spectrum.errors if e.module == "cape" and "cap" in e.message and "ipv4" in e.message]
+
+
+def test_a_json_object_with_a_bare_behavior_key_is_not_a_cape_report(tmp_path: Path) -> None:
+    for document in (
+        {"behavior": "unrelated", "note": "http://example.test/a"},
+        {"network": 5},
+        {"signatures": [], "behavior": {}},
+        {"CAPE": "x"},
+    ):
+        assert _cape_findings(tmp_path, document).input.type == "sample"
+    shaped = _cape_findings(tmp_path, {"behavior": {"processes": [{"pid": 1}]}})
+    assert shaped.input.type == "cape_report"

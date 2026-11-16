@@ -102,8 +102,30 @@ def _normalize(kind: str, value: str) -> str:
     return value
 
 
-def _is_private(raw: str) -> bool:
+_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
+def is_unroutable(raw: str) -> bool:
+    """True for any address that is not a public unicast one.
+
+    Spelled out rather than left to `is_global` alone: the standard library has moved
+    the edges of that property between releases, and a grade must not move with it.
+    """
     try:
-        return ipaddress.ip_address(raw).is_private or ipaddress.ip_address(raw).is_loopback
+        ip = ipaddress.ip_address(raw.strip().strip("[]"))
     except ValueError:
         return False
+    return (
+        not ip.is_global
+        or ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_unspecified
+        or ip.is_reserved
+        or (ip.version == 4 and ip in _CGNAT)
+    )
+
+
+def _is_private(raw: str) -> bool:
+    return is_unroutable(raw)
