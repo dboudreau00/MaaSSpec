@@ -22,25 +22,48 @@ def hash_file(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
-def read_scan_window(path: Path, size: int) -> tuple[bytes, bool]:
+def read_scan_segments(path: Path, size: int) -> tuple[list[bytes], bool]:
+    """The whole file, or its head and tail as two buffers that must never be scanned as one."""
     with path.open("rb") as handle:
         if size <= MAX_SCAN_BYTES:
-            return handle.read(), False
+            return [handle.read()], False
         head = handle.read(MAX_SCAN_BYTES // 2)
         handle.seek(max(0, size - MAX_SCAN_BYTES // 2))
         tail = handle.read(MAX_SCAN_BYTES // 2)
-        return head + tail, True
+        return [head, tail], True
 
 
-def extract_strings(data: bytes) -> tuple[list[str], bool]:
+def read_scan_window(path: Path, size: int) -> tuple[bytes, bool]:
+    segments, truncated = read_scan_segments(path, size)
+    return b"".join(segments), truncated
+
+
+def extract_strings(
+    data: bytes, *, cut_start: bool = False, cut_end: bool = False
+) -> tuple[list[str], bool]:
+    """Printable runs. A run that touches a cut edge is partial, so it is dropped."""
     found: list[str] = []
     truncated = False
     for match in _PRINTABLE.finditer(data):
+        if (cut_start and match.start() == 0) or (cut_end and match.end() == len(data)):
+            continue
         found.append(match.group().decode("ascii"))
         if len(found) >= STRING_LIMIT:
             truncated = True
             break
     return found, truncated
+
+
+def extract_segment_strings(segments: list[bytes]) -> tuple[list[str], bool]:
+    found: list[str] = []
+    for index, segment in enumerate(segments):
+        part, truncated = extract_strings(
+            segment, cut_start=index > 0, cut_end=index < len(segments) - 1
+        )
+        found.extend(part)
+        if truncated or len(found) >= STRING_LIMIT:
+            return found[:STRING_LIMIT], True
+    return found, False
 
 
 def shannon_entropy(data: bytes) -> float:

@@ -28,7 +28,7 @@ from maasspec.modules.base import Module, ModuleOutput
 from maasspec.modules.cape import CapeModule, parse_cape
 from maasspec.modules.example_family import ExampleFamilyModule
 from maasspec.modules.static import StaticModule
-from maasspec.scan import extract_strings, hash_file, read_scan_window
+from maasspec.scan import extract_segment_strings, hash_file, read_scan_segments
 
 MAX_REPORT_BYTES = 128 * 1024 * 1024
 FEED_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -48,7 +48,8 @@ def analyze_path(
     if not path.is_file():
         raise FileNotFoundError(path)
     sha256, size = hash_file(path)
-    window, truncated = read_scan_window(path, size)
+    segments, truncated = read_scan_segments(path, size)
+    window = b"".join(segments)
     cape = _read_report(path, size, window, truncated)
     if cape is not None:
         truncated = False
@@ -57,7 +58,7 @@ def analyze_path(
         input_type = "archive"
     else:
         input_type = "sample"
-    strings, strings_truncated = extract_strings(window)
+    strings, strings_truncated = extract_segment_strings(segments)
     ctx = AnalysisContext(
         path=path,
         filename=path.name,

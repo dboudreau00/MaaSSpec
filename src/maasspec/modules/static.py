@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import io
 import zipfile
+from pathlib import Path
 
 from maasspec.context import AnalysisContext
 from maasspec.models import AnalysisError, Artifact, DraftFinding, SourceRef
@@ -40,7 +40,7 @@ class StaticModule(Module):
                 )
             )
         if ctx.data_for_scan.startswith(b"PK\x03\x04"):
-            members, errors = _zip_members(ctx.data_for_scan)
+            members, errors = _zip_members(ctx.path)
             out.findings.extend(members)
             out.errors.extend(errors)
         drafts, truncated = selector_findings(ctx.strings)
@@ -101,12 +101,12 @@ def _magic(ctx: AnalysisContext) -> DraftFinding:
     )
 
 
-def _zip_members(data: bytes) -> tuple[list[DraftFinding], list[AnalysisError]]:
+def _zip_members(path: Path) -> tuple[list[DraftFinding], list[AnalysisError]]:
     findings: list[DraftFinding] = []
     errors: list[AnalysisError] = []
     try:
-        archive = zipfile.ZipFile(io.BytesIO(data))
-    except zipfile.BadZipFile:
+        archive = zipfile.ZipFile(path)
+    except (zipfile.BadZipFile, OSError):
         errors.append(
             AnalysisError(
                 severity="warning",
@@ -118,6 +118,7 @@ def _zip_members(data: bytes) -> tuple[list[DraftFinding], list[AnalysisError]]:
         return findings, errors
 
     infos = archive.infolist()
+    archive.close()
     total_uncompressed = sum(info.file_size for info in infos)
     if len(infos) > MAX_ZIP_MEMBERS or total_uncompressed > MAX_ZIP_UNCOMPRESSED:
         errors.append(
