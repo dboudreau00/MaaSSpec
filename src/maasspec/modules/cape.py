@@ -58,6 +58,9 @@ class CapeModule(Module):
         def add(kind: str, value: object, technique: str) -> None:
             if not isinstance(value, str) or not value:
                 return
+            if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
+                # A sandbox report is hostile input: a value with a control character (a NUL, say) is not a host.
+                return
             key = (kind, value.lower())
             if key in seen:
                 return

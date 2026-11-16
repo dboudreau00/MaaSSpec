@@ -217,3 +217,12 @@ def test_two_fields_with_the_same_short_name_keep_separate_context(tmp_path: Pat
     )
     config = next(f for f in spectrum.findings if f.subtype == "cape_parser_config")
     assert sorted(config.context.values()) == ["a.example.test", "b.example.test"]
+
+
+def test_a_network_value_with_a_control_character_is_skipped(tmp_path: Path) -> None:
+    report = {"network": {"hosts": [{"ip": "1.2.3.4\x00x"}, {"ip": "198.51.100.7"}],
+                          "dns": [{"request": "bad\x01.example.test"}, {"request": "good.example.test"}]}}
+    spectrum = _analyze(tmp_path, report)
+    values = [str(f.value) for f in spectrum.findings]
+    assert not any("\x00" in v or "\x01" in v for v in values)
+    assert "198.51.100.7" in values and "good.example.test" in values

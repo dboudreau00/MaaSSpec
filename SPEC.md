@@ -229,6 +229,7 @@ in `100.64.0.0/10`, is not routable: it is tagged `scope:private` and scored 0.3
 
 - The static scan finds Bech32 `bc1` addresses only. Legacy `1` and `3` addresses and Monero are out
   of scope for 0.1.
+- A CAPE network value with a control character is skipped, not reported.
 - No module emits the `panel` finding type yet. It is in the closed set and the console defangs it.
 
 ## Non-goals
