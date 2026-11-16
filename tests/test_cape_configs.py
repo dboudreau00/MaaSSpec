@@ -154,3 +154,57 @@ def test_large_json_that_is_not_a_report_stays_a_raw_file(tmp_path: Path) -> Non
 
 def test_the_report_size_cap_is_stated() -> None:
     assert MAX_REPORT_BYTES == 128 * 1024 * 1024
+
+
+def _config_report(fields: dict) -> dict:
+    return {"CAPE": {"configs": [{"ExampleRAT": fields}]}}
+
+
+def test_field_names_are_matched_as_tokens_not_substrings(tmp_path: Path) -> None:
+    spectrum = _analyze(
+        tmp_path,
+        _config_report(
+            {
+                "curl_path": "files.example.test",
+                "ghost": "mirror.example.test",
+                "aggregate": "pool.example.test",
+                "keyboard": "layout-us",
+            }
+        ),
+    )
+    assert not [f for f in spectrum.findings if f.type in {"c2", "crypto_material"}]
+
+
+def test_real_field_names_still_classify(tmp_path: Path) -> None:
+    spectrum = _analyze(
+        tmp_path,
+        _config_report(
+            {
+                "C2": "one.example.test",
+                "ServerURL": "two.example.test",
+                "c2_hosts": ["three.example.test"],
+                "gate": "four.example.test",
+                "RC4Key": "0123456789abcdef",
+                "xor_key": "k3y",
+                "Passwords": ["hunter2"],
+            }
+        ),
+    )
+    domains = {f.value for f in spectrum.findings if f.type == "c2" and f.subtype == "domain"}
+    assert domains == {f"{n}.example.test" for n in ("one", "two", "three", "four")}
+    keys = {f.subtype for f in spectrum.findings if f.type == "crypto_material"}
+    assert {"rc4key", "xor_key", "passwords"} <= keys
+
+
+def test_a_private_url_in_a_config_is_scored_as_private(tmp_path: Path) -> None:
+    spectrum = _analyze(
+        tmp_path,
+        _config_report({"C2": ["https://10.0.0.1/", "https://203.0.113.9/gate", "https://93.184.216.34/gate"]}),
+    )
+    by_value = {f.value: f for f in spectrum.findings if f.type == "c2"}
+    for value in ("https://10.0.0.1/", "https://203.0.113.9/gate"):
+        row = by_value[value]
+        assert row.confidence <= 0.35 and "scope:private" in row.tags
+        assert row.proposed_grade.information_credibility == "4"
+    public = by_value["https://93.184.216.34/gate"]
+    assert public.confidence == 0.6 and "scope:private" not in public.tags

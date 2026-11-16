@@ -26,7 +26,7 @@ from maasspec.models import (
     SourceRef,
 )
 from maasspec.modules.base import ModuleOutput
-from maasspec.selectors import selector_findings
+from maasspec.selectors import is_unroutable, selector_findings
 
 MAX_CONFIGS = 20
 MAX_PAIRS = 200
@@ -37,8 +37,11 @@ MAX_LIST = 50
 MAX_TEXT = 2048
 CONFIG_CONFIDENCE = 0.6
 TAGS = ["sandbox", "cape", "cape_config"]
-_C2_FIELD = re.compile(r"c2|cnc|c&c|server|host|domain|address|url|gate|panel|relay|proxy|\bip\b", re.IGNORECASE)
-_KEY_FIELD = re.compile(r"key|passw|secret|token|rc4|aes|xor|salt|\biv\b|cipher", re.IGNORECASE)
+_C2_TOKENS = frozenset({"server", "host", "domain", "address", "url", "uri", "gate", "panel", "relay", "proxy", "ip"})
+_KEY_TOKENS = frozenset({"key", "secret", "token", "rc4", "aes", "xor", "salt", "iv", "cipher"})
+_KEY_COMPOUND = re.compile(r"(?:rc4|aes|xor|rsa|des)(?:key|iv|salt)s?")
+_HUMPS = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z]{2,})")
+_SEPARATORS = re.compile(r"[^A-Za-z0-9]+")
 _ID_FIELD = re.compile(r"campaign|botnet|mutex|affid|affiliate|group|build|version", re.IGNORECASE)
 _SELECTOR_ID = re.compile(r"campaign|botnet|mutex", re.IGNORECASE)
 _DOMAIN = re.compile(
@@ -60,6 +63,38 @@ _PAYLOAD_GRADE = ProposedGrade(
     information_credibility="3",
     rationale="Payload hash taken from a sandbox report. MaaSSpec has not seen the payload.",
 )
+
+
+def _tokens(name: str) -> list[str]:
+    """Words of a field name: `ServerURL`, `server_url` and `c2-url` are all server, url."""
+    spaced = _HUMPS.sub(" ", name.replace("&", ""))
+    return [token.lower() for token in _SEPARATORS.split(spaced) if token]
+
+
+def _singular(token: str) -> str:
+    for suffix in ("es", "s"):
+        if token.endswith(suffix) and len(token) > len(suffix) + 1:
+            return token[: -len(suffix)]
+    return token
+
+
+def _is_c2_name(name: str) -> bool:
+    for token in _tokens(name):
+        if token.startswith(("c2", "cnc")) or token in _C2_TOKENS or _singular(token) in _C2_TOKENS:
+            return True
+    return False
+
+
+def _is_key_name(name: str) -> bool:
+    for token in _tokens(name):
+        if (
+            token.startswith("passw")
+            or token in _KEY_TOKENS
+            or _singular(token) in _KEY_TOKENS
+            or _KEY_COMPOUND.fullmatch(token)
+        ):
+            return True
+    return False
 
 
 def normalize_cape_section(document: dict, producer: str) -> ModuleOutput:
@@ -137,11 +172,11 @@ def _config(out: ModuleOutput, entry: dict, index: int, seen: set[tuple[str, str
 
 
 def _classify(name: str, value: str, source: SourceRef) -> DraftFinding | None:
-    if _C2_FIELD.search(name):
+    if _is_c2_name(name):
         c2 = _c2(value, source)
         if c2 is not None:
             return c2
-    if _KEY_FIELD.search(name):
+    if _is_key_name(name):
         return DraftFinding(
             type="crypto_material",
             subtype=name.lower()[:64],
@@ -182,12 +217,15 @@ def _c2(raw: str, source: SourceRef) -> DraftFinding | None:
     }
     if re.match(r"https?://", value, re.IGNORECASE):
         host = (urlsplit(value).hostname or "").lower()
+        private = is_unroutable(host)
         selectors = [Selector(kind="url", value=value, normalized=host or value.lower())]
         if host:
             selectors.append(Selector(kind="domain", value=host, normalized=host))
         return DraftFinding(
-            subtype="url", value=value, normalized=host or value.lower(), confidence=CONFIG_CONFIDENCE,
-            selectors=selectors, proposed_grade=_PARSER_GRADE, tags=TAGS, **common,
+            subtype="url", value=value, normalized=host or value.lower(),
+            confidence=0.35 if private else CONFIG_CONFIDENCE, selectors=selectors,
+            proposed_grade=_PRIVATE_GRADE if private else _PARSER_GRADE,
+            tags=[*TAGS, "scope:private"] if private else TAGS, **common,
         )  # fmt: skip
     parsed = _ip_port(value)
     if parsed is not None:
