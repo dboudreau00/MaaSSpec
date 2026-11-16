@@ -156,6 +156,31 @@ before relying on them. The UnpacMe field names come from the public Go
 client's models; the shape of `deepmatch` and `detectit` entries is not
 normalized in 0.1.
 
+## Web UI
+
+`maasspec serve` serves the built UI (`ui/app/dist`) and a JSON API on `127.0.0.1` only. The design
+source is `ui/design/` (exported design source); the working app is `ui/app/`.
+
+Access: every `/api` call needs `X-MaaSSpec-Token`, a per-run random token printed in the URL
+fragment. The `Host` header must be `127.0.0.1:<port>` or `localhost:<port>`, and a cross-origin
+request is refused. Static files are served with a CSP of `default-src 'none'; script-src 'self'`
+and no caching. Bodies are capped (64 MiB for files, 1 MiB for JSON).
+
+| Endpoint | Does |
+|---|---|
+| `GET /api/status` | version, env var names, ingest URL, key set or not (never values), feed queries |
+| `GET /api/spectra` | the session's spectra |
+| `POST /api/spectra/parse` | validate a `.json` or `.jsonl` upload and add its spectra |
+| `POST /api/analyze?filename=` | static analysis of an upload (written to a temp file, then deleted) |
+| `POST /api/import?feed=&limit=` | turn a saved feed response or export into spectra |
+| `POST /api/feeds/fetch` | one read-only feed query; the server keeps the response |
+| `POST /api/feeds/import` | turn a held fetch into spectra |
+| `POST /api/send` | send held spectra by analysis id, in order, stop at the first failure |
+
+`/api/send` takes ids only: what is sent is what the server produced or validated, serialized the
+same way as `maasspec ingest`. The UI shows destination host, key state, Idempotency-Key per
+spectrum, and per-row results (sent, failed with status, not sent).
+
 ## Modules
 
 `Module.accepts(ctx)` then `Module.run(ctx) -> ModuleOutput`.

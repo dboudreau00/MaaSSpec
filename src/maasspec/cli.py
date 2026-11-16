@@ -53,6 +53,13 @@ def _parser() -> argparse.ArgumentParser:
     )
     post.add_argument("path", nargs="?", default="-")
 
+    serve = sub.add_parser(
+        "serve",
+        help="Local web UI on 127.0.0.1 with a per-run token. Keys come from the environment.",
+    )
+    serve.add_argument("--port", type=int, default=8787, help="0 picks a free port.")
+    serve.add_argument("--ui-dir", type=Path, help="Built UI. Defaults to ui/app/dist in the repo.")
+
     feed = sub.add_parser("feed", help="Public malware feeds: list, fetch, import.")
     feed_sub = feed.add_subparsers(dest="feed_command", required=True)
     feed_sub.add_parser("list", help="Show feeds and their queries.")
@@ -121,6 +128,23 @@ def _ingest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _serve(args: argparse.Namespace) -> int:
+    from maasspec.serve import default_ui_dir, make_server
+
+    if not 0 <= args.port <= 65535:
+        print("--port must be between 0 and 65535.", file=sys.stderr)
+        return 2
+    server, token = make_server(args.ui_dir or default_ui_dir(), port=args.port, env=os.environ)
+    print(f"MaaSSpec UI: http://127.0.0.1:{server.server_address[1]}/#t={token}", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    return 0
+
+
 def _feed(args: argparse.Namespace) -> int:
     if args.feed_command == "list":
         for name in sorted(ADAPTERS):
@@ -176,6 +200,7 @@ _COMMANDS = {
     "schema": _schema,
     "ndjson": _ndjson,
     "ingest": _ingest,
+    "serve": _serve,
     "feed": _feed,
 }
 
