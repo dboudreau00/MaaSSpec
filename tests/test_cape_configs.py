@@ -226,3 +226,16 @@ def test_a_network_value_with_a_control_character_is_skipped(tmp_path: Path) -> 
     values = [str(f.value) for f in spectrum.findings]
     assert not any("\x00" in v or "\x01" in v for v in values)
     assert "198.51.100.7" in values and "good.example.test" in values
+
+
+def test_no_nul_reaches_a_spectrum_from_any_field(tmp_path: Path) -> None:
+    report = {
+        "malfamily": "F\x00x",
+        "network": {"hosts": [{"ip": "198.51.100.7"}]},
+        "signatures": [{"name": "sig\x00x", "description": "d\x00e", "severity": 2}],
+        "CAPE": {"configs": [{"Fam\x00ily": {"C2": ["c2.example.test\x00x"], "Note": "n\x00ote"}}]},
+    }
+    spectrum = _analyze(tmp_path, report)
+    text = spectrum.model_dump_json()
+    assert "\\u0000" not in text and "\x00" not in text
+    assert "\ufffd" in text or "\\ufffd" in text

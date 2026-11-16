@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SCHEMA_VERSION = "0.1.0"
 SCHEMA_ID = "maasspec/spectrum.schema.json"
@@ -30,8 +30,25 @@ SourceReliability = Literal["A", "B", "C", "D", "E", "F"]
 InformationCredibility = Literal["1", "2", "3", "4", "5", "6"]
 
 
+def _without_nul(value: Any) -> Any:
+    """A NUL character is replaced by U+FFFD in a string, in a dict key and in nested lists and dicts. A report
+    is hostile input, and NocTORnal's store cannot hold a NUL, so it refuses a spectrum that carries one."""
+    if isinstance(value, str):
+        return value.replace("\x00", "\ufffd")
+    if isinstance(value, dict):
+        return {(_without_nul(k) if isinstance(k, str) else k): _without_nul(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_without_nul(v) for v in value]
+    return value
+
+
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _no_nul(cls, value: Any) -> Any:
+        return _without_nul(value)
 
 
 class ToolInfo(_Strict):

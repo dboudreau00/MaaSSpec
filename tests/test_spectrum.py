@@ -278,3 +278,14 @@ def test_a_spectrum_over_the_noctornal_cap_is_not_sent() -> None:
     with pytest.raises(IngestError):
         client.submit_spectrum(spectrum, opener=opener)
     assert calls == []
+
+
+def test_a_model_never_holds_a_nul_even_in_a_nested_free_form_value() -> None:
+    from maasspec.models import DraftFinding
+
+    draft = DraftFinding(type="other", value={"k\x00": ["a\x00b", {"c": "d\x00"}]}, normalized="n\x00",
+                         confidence=0.5, tags=["t\x00"])
+    dumped = draft.model_dump_json()
+    assert "\\u0000" not in dumped
+    assert draft.value == {"k\ufffd": ["a\ufffdb", {"c": "d\ufffd"}]}
+    assert draft.tags == ["t\ufffd"]
