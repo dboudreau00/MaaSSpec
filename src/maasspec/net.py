@@ -2,7 +2,7 @@
 
 Every request names the hosts it may reach. HTTPS is required, except plain
 HTTP to a loopback host when the caller opts in. Redirects are refused, so a
-key never follows a 3xx to another host. Credentials in the URL are refused.
+key never follows a 3xx to another host. Credentials in the URL are refused. Proxy environment variables are ignored.
 Responses are read up to a cap. Exceptions never carry headers or the query.
 """
 
@@ -31,7 +31,10 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def _default_opener(request: urllib.request.Request, timeout: float) -> Any:
-    return urllib.request.build_opener(_NoRedirect()).open(request, timeout=timeout)
+    # An empty ProxyHandler: HTTP_PROXY and friends must not carry a key or a request off the allowlisted host.
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect()).open(
+        request, timeout=timeout
+    )
 
 
 def request(
