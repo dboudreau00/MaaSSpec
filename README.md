@@ -211,7 +211,8 @@ for the session. Review marks live in the browser only.
 ## Next module
 
 Copy `modules/example_family.py`. Return `DraftFinding` values and, if you are willing to claim a family,
-a `FamilySummary`. Register the class in `engine.default_modules`. Keep fixtures synthetic, and read
+a `FamilySummary`. Register the class in `engine.default_modules`. The example family is not on the default
+pipeline: pass it to `analyze_path(modules=[...])` to run it. Keep fixtures synthetic, and read
 `SPEC.md` before editing.
 
 ## License

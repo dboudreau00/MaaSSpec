@@ -26,7 +26,6 @@ from maasspec.models import (
 )
 from maasspec.modules.base import Module, ModuleOutput
 from maasspec.modules.cape import CapeModule, parse_cape
-from maasspec.modules.example_family import ExampleFamilyModule
 from maasspec.modules.static import StaticModule
 from maasspec.scan import extract_segment_strings, hash_file, read_scan_segments
 
@@ -35,7 +34,7 @@ FEED_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 def default_modules() -> list[Module]:
-    return [StaticModule(), CapeModule(), ExampleFamilyModule()]
+    return [StaticModule(), CapeModule()]
 
 
 def analyze_path(

@@ -12,6 +12,9 @@ from maasspec.engine import analyze_path
 from maasspec.ingest.noctornal import IngestClient, spectrum_ndjson
 from maasspec.models import InputInfo, Spectrum, ToolInfo, spectrum_json_schema
 from maasspec.modules.base import Module
+from maasspec.modules.cape import CapeModule
+from maasspec.modules.example_family import ExampleFamilyModule
+from maasspec.modules.static import StaticModule
 
 KEY = "noct_sk_live_" + "A1b2C3d4" * 4
 STAMP = datetime(2026, 11, 16, tzinfo=UTC)
@@ -37,7 +40,12 @@ def test_sample_spectrum(tmp_path: Path) -> None:
     sample = tmp_path / "fixture.txt"
     sample.write_bytes(FIXTURE)
     analysis_id = UUID("11111111-1111-4111-8111-111111111111")
-    spectrum = analyze_path(sample, analysis_id=analysis_id, now=STAMP)
+    spectrum = analyze_path(
+        sample,
+        analysis_id=analysis_id,
+        now=STAMP,
+        modules=[StaticModule(), CapeModule(), ExampleFamilyModule()],
+    )
 
     Spectrum.model_validate(spectrum.model_dump())
     assert spectrum.input.sha256 == hashlib.sha256(FIXTURE).hexdigest()
@@ -233,3 +241,22 @@ def test_a_json_object_with_a_bare_behavior_key_is_not_a_cape_report(tmp_path: P
         assert _cape_findings(tmp_path, document).input.type == "sample"
     shaped = _cape_findings(tmp_path, {"behavior": {"processes": [{"pid": 1}]}})
     assert shaped.input.type == "cape_report"
+
+
+def test_the_example_family_is_not_on_the_default_pipeline(tmp_path: Path) -> None:
+    from maasspec.engine import default_modules
+
+    assert "family.example" not in {module.name for module in default_modules()}
+    sample = tmp_path / "fixture.txt"
+    sample.write_bytes(FIXTURE)
+    spectrum = analyze_path(sample)
+    assert spectrum.summary is not None
+    assert spectrum.summary.family is None
+    assert not [f for f in spectrum.findings if f.subtype == "fixture_marker"]
+
+
+def test_the_example_family_still_runs_when_passed_explicitly(tmp_path: Path) -> None:
+    sample = tmp_path / "fixture.txt"
+    sample.write_bytes(FIXTURE)
+    spectrum = analyze_path(sample, modules=[StaticModule(), ExampleFamilyModule()])
+    assert spectrum.summary.family is not None and spectrum.summary.family.name == "example"

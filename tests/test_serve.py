@@ -163,7 +163,7 @@ def test_analyze_cleans_the_name_and_never_keeps_the_file(app) -> None:
     status, _, data = call(app, "POST", "/api/analyze?filename=..%2F..%2Fevil%20name%3F.txt", body=SAMPLE)
     spectrum = json.loads(data)["spectra"][0]
     assert status == 200 and spectrum["input"]["filename"] == "evil name_.txt"
-    assert spectrum["summary"]["family"]["name"] == "example"
+    assert spectrum["summary"]["family"] is None
     status, _, data = call(app, "POST", "/api/analyze?filename=CON", body=SAMPLE)
     assert status == 200 and json.loads(data)["spectra"][0]["input"]["filename"] == "CON"
 
