@@ -181,8 +181,14 @@ python -m maasspec ingest mb.spectra.jsonl
 
 `feed import` also reads UnpacMe results JSON and the MalwareBazaar and ThreatFox exports you download
 yourself. Re-importing the same export sends the same `Idempotency-Key` per record. Issue the NocTORnal
-ingest key with the declared category `IOC_FEED`. NocTORnal has no MaaSSpec mapper yet, so spectra wait in
-its ingest queue for a person to triage.
+ingest key with the declared category `IOC_FEED`. Feed spectra are byte-stable (their timestamps are the
+record's own, or a fixed epoch), so a re-import is an identical body under the same key.
+
+On the NocTORnal side, when the operator sets `NOCTORNAL_MAASSPEC=on` the ingest parse step validates a
+spectrum strictly against the same contract and files it in the ingest queue as category `IOC_FEED`;
+invalid ones go to the dead letters. With the switch off, the default, a spectrum waits in the queue as
+before. MaaSSpec never calls the parse endpoint. The `Idempotency-Key` is the `analysis_id`.
+`maasspec_version` is the contract version (`0.1.0`) and does not follow the package version.
 
 ## CAPE reports
 

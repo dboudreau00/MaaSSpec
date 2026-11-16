@@ -78,8 +78,12 @@ Partial results are valid. Gaps go in `errors` with `info`, `warning`, or
 - No bytes from the sample are written back out except hashes, names, and
   the short values already inside findings.
 - ZIP: refuse more than 200 members or 64 MiB of declared uncompressed
-  size. Never extract. Skip absolute paths and `..`.
-- Scan window: 8 MiB, head and tail when the file is larger. The SHA-256
+  size. Never extract. The member list is read from the file's own central
+  directory, whatever the file's size. Skip absolute, drive-lettered and UNC
+  paths, and `..`.
+- Scan window: 8 MiB, head and tail when the file is larger. The two halves
+  are scanned as separate buffers, so a string that would only exist across the
+  seam is never built, and a string cut by a window edge is dropped. The SHA-256
   still covers the whole file. `metadata.scan_window_truncated` says so. A JSON object is the
   exception: it is read whole, up to 128 MiB, so a CAPE report (usually larger than the window) is
   parsed. Larger JSON is analyzed as a raw file and a warning says so.
@@ -100,10 +104,20 @@ finding). It is not sent unless an operator posts it themselves.
 `maasspec ingest` accepts one spectrum or a JSON Lines stream (one compact
 spectrum per line, from a file or stdin) and posts each as its own request
 with its own `Idempotency-Key`. It stops at the first rejection. Issue the
-ingest key with the declared category `IOC_FEED` for feed spectra. NocTORnal
-categorises by the key's declared category or by the structure of the body;
-it has no MaaSSpec mapper, so a spectrum waits in the ingest queue until a
-person triages it or a mapper is added on that side.
+ingest key with the declared category `IOC_FEED` for feed spectra.
+
+What NocTORnal does with a spectrum: when the operator sets
+`NOCTORNAL_MAASSPEC=on`, the ingest parse step validates the spectrum strictly
+against this same contract and files it in the ingest queue as category
+`IOC_FEED`. A spectrum that does not validate goes to the dead letters. With the
+switch off, which is the default, a spectrum waits in the queue as before. The
+parse step is a person's action in NocTORnal: MaaSSpec never calls the parse
+endpoint.
+
+The `Idempotency-Key` is the `analysis_id`. Feed spectra are byte-stable, so a
+re-import is an identical body under the same key. `maasspec_version` is the
+contract version (`0.1.0`). It does not follow the package version; `tool.version`
+is the package version and is informational.
 
 ## CAPE reports
 
@@ -113,14 +127,22 @@ dumped payloads are CAPE parsers, written for and run by CAPE (`custom/parsers/`
 enabled with `[CAPE_extractors]` in `processing.conf`). MaaSSpec does not run extractor code.
 
 A `configs` entry is `{family: {fields}}`; field names are the parser's own, so they are read by
-name pattern: fields named like a C2 (c2, cnc, server, host, domain, address, url, gate, panel, ip)
+name, by whole word (`ServerURL`, `server_url` and `c2-url` match; `curl_path`, `ghost` and
+`keyboard` do not): fields named like a C2 (c2, cnc, server, host, domain, address, url, gate, panel, ip)
 become `c2` findings when the value is a URL, host, or IP with optional port; fields named like a
 key (key, password, secret, token, rc4, aes, xor, salt, iv) become `crypto_material`; campaign,
 botnet and mutex fields become `config` findings with a selector; every other string goes through
 the same selector scan as a local sample. The family key becomes the family claim. The payload
 hashes in `_associated_config_hashes` and `CAPE.payloads` become `sandbox_payload` artifacts and hash
 selectors. Parser field names that match none of these patterns stay in the `cape_parser_config`
-finding's context (first 30 fields).
+finding's context (first 30 fields). Two fields with the same short name are both kept, the
+second under its path. A config URL or address that is not public is `scope:private`, 0.35, C/4.
+
+A report is recognised by CAPE's own shapes: `network` with a hosts, http, https or dns list,
+`signatures` with named entries, `behavior` with processes or a summary, or `CAPE` with configs or
+payloads. A bare `behavior` or `network` key is not enough. Network hosts, URLs and DNS names are
+de-duplicated and capped at 200 per kind, with a warning row when the cap trips. A non-public
+address is `scope:private`, 0.35, C/4, as in configs and ThreatFox.
 
 ## Feeds
 
@@ -144,6 +166,12 @@ What a record becomes:
   IP:port yields an `ipv4` selector and an `ipv4_port` selector.
 - UnpacMe layer strings go through the same selector scan as a local sample.
 - `analysis_id` is a UUIDv5 over feed, adapter version, and record hash.
+- A feed spectrum is byte-stable: the same export imported twice gives identical
+  JSON. `generated_at` and every finding's `first_seen_in_analysis` are the
+  record's own sighting time (`first_seen` or `created`) when it carries one,
+  else the fixed epoch `1970-01-01T00:00:00Z`. For feed spectra these two fields
+  are the record's, not wall-clock. Spectra of samples and CAPE reports keep
+  wall-clock time.
 - `metadata` holds `feed`, `feed_record_id`, `claimed_sample_sha256`, and
   `claims_not_verified: true`.
 
@@ -164,11 +192,12 @@ source is `ui/design/` (exported design source); the working app is `ui/app/`.
 Access: every `/api` call needs `X-MaaSSpec-Token`, a per-run random token printed in the URL
 fragment. The `Host` header must be `127.0.0.1:<port>` or `localhost:<port>`, and a cross-origin
 request is refused. Static files are served with a CSP of `default-src 'none'; script-src 'self'`
-and no caching. Bodies are capped (64 MiB for files, 1 MiB for JSON).
+and no caching. Bodies are capped (128 MiB for `/api/analyze`, the engine's report ceiling; 64 MiB for
+spectrum and feed files; 1 MiB for JSON). An import limit is at most 5,000, what the session keeps.
 
 | Endpoint | Does |
 |---|---|
-| `GET /api/status` | version, env var names, ingest URL, key set or not (never values), feed queries |
+| `GET /api/status` | version, env var names, the ingest address as scheme, host and port after the client's own checks (never the raw string), key set or not (never values), feed queries |
 | `GET /api/spectra` | the session's spectra |
 | `POST /api/spectra/parse` | validate a `.json` or `.jsonl` upload and add its spectra |
 | `POST /api/analyze?filename=` | static analysis of an upload (written to a temp file, then deleted) |
@@ -188,6 +217,19 @@ spectrum, and per-row results (sent, failed with status, not sent).
 `AnalysisContext` holds the path, the scan window, the hash, the size,
 the input type, extracted strings, and parsed JSON when the input was a
 CAPE report. Modules must treat all of that as hostile data.
+
+## Not routable
+
+A private, loopback, link-local, multicast, unspecified, reserved or documentation address, or one
+in `100.64.0.0/10`, is not routable: it is tagged `scope:private` and scored 0.35, C/4. The rule is
+`selectors.is_unroutable`, spelled out and pinned by tests rather than left to the interpreter's
+`is_global`, so a newer `ipaddress` does not move grades.
+
+## Known limits
+
+- The static scan finds Bech32 `bc1` addresses only. Legacy `1` and `3` addresses and Monero are out
+  of scope for 0.1.
+- No module emits the `panel` finding type yet. It is in the closed set and the console defangs it.
 
 ## Non-goals
 
