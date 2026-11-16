@@ -129,7 +129,7 @@ export type FeedStatus = { needsKey: boolean; keySet: boolean; queries: Record<s
 export type ApiStatus = {
   version: string
   env: { ingestUrl: string; ingestKey: string; abusech: string }
-  ingest: { url: string | null; keySet: boolean }
+  ingest: { url: string | null; scheme: string | null; host: string | null; port: number | null; problem: string | null; keySet: boolean }
   feeds: Record<string, FeedStatus>
 }
 

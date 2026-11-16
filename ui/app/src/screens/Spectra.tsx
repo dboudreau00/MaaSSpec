@@ -4,7 +4,7 @@ import { AlertTriangle, ChevronDown, Loader2, OctagonX, Plus, Search } from 'luc
 
 import { Button, CopyButton, Help, Notice, ReviewMark, Select, Toggle, TypeChip } from '../components/ui'
 import { api, errorText } from '../api'
-import { FEED_IDS, INPUT_TYPES, shortHash } from '../format'
+import { FEED_IDS, INPUT_TYPES, shortHash, spectrumHaystack } from '../format'
 import type { RawSpectrum, Review, Spectrum } from '../types'
 
 type Props = {
@@ -74,8 +74,7 @@ export default function Spectra({ spectra: data, loading, loadError, selected, m
         if (mc > 0 && !s.findings.some((f) => f.confidence >= mc)) return false
         if (q.trim()) {
           const needle = q.trim().toLowerCase()
-          const hay = [s.sha256, ...s.findings.flatMap((f) => f.selectors.map((x) => x.normalized))].join(' ').toLowerCase()
-          if (!hay.includes(needle)) return false
+          if (!spectrumHaystack(s).includes(needle)) return false
         }
         return true
       }),

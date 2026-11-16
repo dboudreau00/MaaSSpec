@@ -27,13 +27,24 @@ export function formatBytes(n: number | null) {
   return `${n} B`
 }
 
-/** Defang URLs and domains for display. Never used for copy. */
+/** Defang URLs and domains for display. Never used for copy. The whole authority (userinfo, host, port) is dotted. */
 export function defang(value: string) {
-  const m = value.match(/^(https?)(:\/\/)([^/:]+)(.*)$/i)
+  const m = value.match(/^(https?)(:\/\/)([^/?#]*)(.*)$/i)
   if (m) return `${m[1].replace(/t/gi, 'x')}${m[2]}${m[3].replace(/\./g, '[.]')}${m[4]}`
   const host = value.match(/^([a-z0-9-]+(?:\.[a-z0-9-]+)+)(:\d{1,5})?$/i)
   if (host && !/^\d+(\.\d+){3}$/.test(host[1])) return `${host[1].replace(/\./g, '[.]')}${host[2] ?? ''}`
   return value
+}
+
+/** Everything the spectra search can match, built from the parsed spectrum and never from rendered markup. */
+export function spectrumHaystack(s: Spectrum) {
+  const parts: string[] = [s.sha256, s.analysisId, s.name, s.family?.name ?? '']
+  for (const issue of s.issues) parts.push(issue.message)
+  for (const f of s.findings) {
+    parts.push(f.type, f.subtype, f.value, ...Object.values(f.context))
+    for (const x of f.selectors) parts.push(x.value, x.normalized)
+  }
+  return parts.join(' ').toLowerCase()
 }
 
 export function isDefangable(value: string) {

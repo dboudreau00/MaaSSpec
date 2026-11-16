@@ -186,7 +186,7 @@ its ingest queue for a person to triage.
 
 ## CAPE reports
 
-`analyze` reads a CAPE `report.json` (up to 128 MiB): network, signatures, `malfamily`, and the `CAPE`
+`analyze` reads a CAPE `report.json` (up to 128 MiB, and the console's upload takes the same): network, signatures, `malfamily`, and the `CAPE`
 section that CAPE's configuration parsers fill. Write custom extractors as CAPE parsers (`custom/parsers/`
 on the CAPE host); their `CAPE.configs` output becomes C2, key, and identifier findings capped at 0.6.
 See `SPEC.md`.

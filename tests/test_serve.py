@@ -141,7 +141,14 @@ def test_status_reports_state_but_never_key_values(app) -> None:
         "ingestKey": "MAASSPEC_INGEST_KEY",
         "abusech": "MAASSPEC_ABUSECH_KEY",
     }
-    assert info["ingest"] == {"url": "https://case.example.test", "keySet": True}
+    assert info["ingest"] == {
+        "url": "https://case.example.test",
+        "scheme": "https",
+        "host": "case.example.test",
+        "port": None,
+        "problem": None,
+        "keySet": True,
+    }
     assert set(info["feeds"]) == {"malwarebazaar", "threatfox", "unpacme"}
     assert info["feeds"]["threatfox"]["keySet"] is True and "recent" in info["feeds"]["threatfox"]["queries"]
     assert info["feeds"]["unpacme"] == {"needsKey": False, "keySet": False, "queries": info["feeds"]["unpacme"]["queries"]}
@@ -283,3 +290,52 @@ def test_serve_prints_a_loopback_url_with_a_token_and_stops_on_ctrl_c(tmp_path, 
     line = capsys.readouterr().out.strip()
     assert line.startswith("MaaSSpec UI: http://127.0.0.1:") and "/#t=" in line
     assert len(line.rsplit("#t=", 1)[1]) >= 30
+
+
+def _status_with(tmp_path, url: str) -> dict:
+    (tmp_path / "index.html").write_text("<!doctype html><title>MaaSSpec</title>", encoding="utf-8")
+    server, _ = make_server(
+        tmp_path, port=0, env={"MAASSPEC_NOCTORNAL_URL": url, "MAASSPEC_INGEST_KEY": INGEST_KEY}, token=TOKEN
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        holder = App(port=server.server_address[1], env={})
+        status, _, data = call(holder, "GET", "/api/status")
+        assert status == 200
+        return {"text": data.decode(), "info": json.loads(data)}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_status_never_returns_the_raw_ingest_url(tmp_path) -> None:
+    bad = _status_with(tmp_path, "https://alice:hunter2@case.example.test/base?token=SECRETQ#FRAGMARK")
+    assert bad["info"]["ingest"]["url"] is None
+    for leaked in ("alice", "hunter2", "SECRETQ", "FRAGMARK", "/base"):
+        assert leaked not in bad["text"]
+    good = _status_with(tmp_path, "http://127.0.0.1:8123/some/prefix")
+    ingest = good["info"]["ingest"]
+    assert (ingest["scheme"], ingest["host"], ingest["port"]) == ("http", "127.0.0.1", 8123)
+    assert ingest["url"] == "http://127.0.0.1:8123"
+    assert "prefix" not in good["text"]
+    plain_http = _status_with(tmp_path, "http://case.example.test")
+    assert plain_http["info"]["ingest"]["url"] is None
+
+
+def test_analyze_takes_a_report_up_to_the_engine_ceiling(app) -> None:
+    from maasspec.engine import MAX_REPORT_BYTES
+
+    pad = "x" * (65 * 1024 * 1024)
+    report = json.dumps({"network": {"hosts": [{"ip": "93.184.216.34"}]}, "pad": pad}).encode()
+    assert len(report) > 64 * 1024 * 1024
+    status, _, data = call(app, "POST", "/api/analyze?filename=big.json", body=report)
+    assert status == 200
+    spectrum = json.loads(data)["spectra"][0]
+    assert spectrum["input"]["type"] == "cape_report"
+    assert any(f["value"] == "93.184.216.34" for f in spectrum["findings"])
+    head = (
+        f"POST /api/analyze HTTP/1.1\r\nHost: 127.0.0.1:{app.port}\r\n"
+        f"X-MaaSSpec-Token: {TOKEN}\r\nConnection: close\r\n"
+    )
+    assert b"413" in raw(app, (head + f"Content-Length: {MAX_REPORT_BYTES + 1}\r\n\r\n").encode())

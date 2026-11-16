@@ -34,7 +34,7 @@ export function FindingsTable({ spectrum, sourceFilter, onClearFilter }: Props) 
         <span className="inline-flex items-center gap-1.5">
           <Toggle label="Defang URLs and domains" checked={defanged} onChange={setDefanged} />
           <Help>
-            Defanged values read hxxps:// and [.] so they cannot be followed by accident. Copy follows this toggle. Values
+            Defanged values read hxxps:// and [.] so they cannot be followed by accident. Copy always puts the raw value on the clipboard. Values
             are never rendered as links.
           </Help>
         </span>
@@ -145,7 +145,7 @@ function Row({ f, defanged, open, onToggle }: { f: Finding; defanged: boolean; o
             <span className={`truncate font-mono text-[12px] ${tone}`} title={shown}>
               {shown}
             </span>
-            <CopyButton value={shown} label="Copy value" />
+            <CopyButton value={f.value} label="Copy value" />
             {defanged && network && isDefangable(f.value) && <span className="sr-only">defanged</span>}
           </span>
         </Td>

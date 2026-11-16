@@ -28,10 +28,10 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from maasspec import __version__, net
-from maasspec.engine import analyze_path, spectra_from_feed
+from maasspec.engine import MAX_REPORT_BYTES, analyze_path, spectra_from_feed
 from maasspec.feeds import ADAPTERS, get_adapter
 from maasspec.feeds.base import MAX_IMPORT_BYTES, FeedFormatError, FetchOptions
-from maasspec.ingest.noctornal import IngestClient
+from maasspec.ingest.noctornal import IngestClient, check_base_url
 from maasspec.models import Spectrum
 from maasspec.stream import parse_spectra
 
@@ -40,6 +40,7 @@ INGEST_KEY_ENV = "MAASSPEC_INGEST_KEY"
 ABUSECH_KEY_ENV = "MAASSPEC_ABUSECH_KEY"
 DEFAULT_PORT = 8787
 MAX_JSON_BODY = 1024 * 1024
+MAX_ANALYZE_BYTES = MAX_REPORT_BYTES
 MAX_SPECTRA = 5000
 MAX_FETCHES = 8
 MAX_SEND = 500
@@ -95,12 +96,11 @@ class Session:
         self._fetches: OrderedDict[str, tuple[str, bytes]] = OrderedDict()
 
     def status(self) -> dict[str, Any]:
-        url = self.env.get(INGEST_URL_ENV, "")
         has_abusech = bool(self.env.get(ABUSECH_KEY_ENV))
         return {
             "version": __version__,
             "env": {"ingestUrl": INGEST_URL_ENV, "ingestKey": INGEST_KEY_ENV, "abusech": ABUSECH_KEY_ENV},
-            "ingest": {"url": url or None, "keySet": bool(self.env.get(INGEST_KEY_ENV))},
+            "ingest": {**self._ingest_address(), "keySet": bool(self.env.get(INGEST_KEY_ENV))},
             "feeds": {
                 name: {
                     "needsKey": adapter.needs_key,
@@ -109,6 +109,27 @@ class Session:
                 }
                 for name, adapter in ADAPTERS.items()
             },
+        }
+
+    def _ingest_address(self) -> dict[str, Any]:
+        """Scheme, host and port of the configured NocTORnal, once the client's own checks pass. Never the raw string."""
+        raw = self.env.get(INGEST_URL_ENV, "")
+        empty: dict[str, Any] = {"url": None, "scheme": None, "host": None, "port": None, "problem": None}
+        if not raw:
+            return empty
+        try:
+            parts = check_base_url(raw)
+        except ValueError as exc:
+            return {**empty, "problem": str(exc)}
+        host = (parts.hostname or "").lower()
+        origin_host = f"[{host}]" if ":" in host else host
+        port = parts.port
+        return {
+            "url": f"{parts.scheme}://{origin_host}" + (f":{port}" if port else ""),
+            "scheme": parts.scheme,
+            "host": host,
+            "port": port,
+            "problem": None,
         }
 
     def all_spectra(self) -> list[dict]:
@@ -289,7 +310,7 @@ class _Handler(BaseHTTPRequestHandler):
             close = exc.close
             if method == "POST":
                 close = self._framing_error or not self._drain(
-                    MAX_IMPORT_BYTES if self._authed else MAX_JSON_BODY
+                    MAX_ANALYZE_BYTES if self._authed else MAX_JSON_BODY
                 )
             self._json(exc.status, {"error": exc.message}, close=close)
         except Exception as exc:  # noqa: BLE001 - never leak internals to the browser
@@ -323,7 +344,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(200, {"spectra": session.parse(self._body(MAX_IMPORT_BYTES))})
         elif method == "POST" and path == "/api/analyze":
             name = (query.get("filename") or ["upload"])[0]
-            self._json(200, {"spectra": session.analyze(name, self._body(MAX_IMPORT_BYTES))})
+            self._json(200, {"spectra": session.analyze(name, self._body(MAX_ANALYZE_BYTES))})
         elif method == "POST" and path == "/api/import":
             feed = (query.get("feed") or [""])[0]
             limit = _limit(_query_int(query, "limit", 1000))
