@@ -1,0 +1,3 @@
+MAASSPEC_FAMILY_EXAMPLE
+panel https://panel.example.test/gate.php
+operator@example.test

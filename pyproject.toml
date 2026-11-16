@@ -1,0 +1,23 @@
+[project]
+name = "maasspec"
+version = "0.1.0"
+description = "Provenance-first malware spectrometer. Emits structured spectra for case systems such as NocTORnal."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-only"
+authors = [{ name = "MaaSSpec authors" }]
+dependencies = ["pydantic>=2.6"]
+
+[project.scripts]
+maasspec = "maasspec.cli:main"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
