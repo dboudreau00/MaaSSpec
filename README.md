@@ -6,10 +6,103 @@ One input in, one spectrum out. Findings stay proposals until a person accepts t
 Built to sit beside [NocTORnal](https://github.com/dboudreau00/NocTORnal). NocTORnal keeps the case,
 the graph, and the custody chain. MaaSSpec does not.
 
+![Spectra list with feed records, samples, an archive, and a CAPE report](docs/images/01-spectra.png)
+
 **0.1.0 is the framework.** The static scan, the spectrum schema, the CAPE normalizer (including CAPE's
 own parser output), three public-feed adapters (MalwareBazaar, ThreatFox, UnpacMe), the NocTORnal ingest
 client, a local web UI, and the family-plugin contract run. The only family module is a synthetic marker
 used to prove that contract. It does not identify a real family.
+
+## Screens
+
+The screenshots use synthetic data.
+
+### Spectra
+
+The list at the top of this page: one row per spectrum, from local files and from feeds. Review marks
+(Unreviewed, Reviewed, Skip) are kept in the browser only and are never sent.
+
+![Add menu](docs/images/02-add-menu.png)
+
+Add: open a spectra file, analyze a file (static, local), or import a saved feed export.
+
+### Reading a spectrum
+
+![CAPE report findings](docs/images/03-cape-report-findings.png)
+
+A CAPE report. The family claim comes from CAPE's parser, and findings are grouped by type with
+confidence, grade, and provenance. URLs and domains are defanged by default and are never links.
+
+![A finding expanded](docs/images/04-finding-expanded.png)
+
+A finding expanded: module, technique, confidence method, source, grade rationale, and selectors.
+
+![Artifacts](docs/images/05-artifacts-unpacked-layers.png)
+
+Artifacts: the submitted sample and its unpacked layer, as UnpacMe reported them. Nothing is fetched.
+
+![Issues](docs/images/06-issues.png)
+
+Issues: an archive member with an unsafe name is skipped and reported.
+
+![A feed record](docs/images/07-feed-claim.png)
+
+A feed record. Feed findings carry the claimed marker, and the banner says the sample was not fetched.
+
+![Scan window notice](docs/images/08-scan-window-notice.png)
+
+A file larger than the scan window: the hash covers the whole file, inspection covers 8 MiB.
+
+![Raw JSON](docs/images/09-raw-json.png)
+
+Raw JSON: the exact spectrum.
+
+### Selectors
+
+![Selectors](docs/images/10-selectors.png)
+
+Every hash, host, and URL across the loaded spectra, and the spectra each one appears in.
+
+### Feeds
+
+![Feeds](docs/images/11-feeds.png)
+
+One read-only query per card. Key state is shown by variable name, never by value. The command under each
+card is the CLI equivalent.
+
+![Feeds after a fetch](docs/images/12-feeds-fetched.png)
+
+After a fetch: the size received, and Import.
+
+### Send
+
+![Send](docs/images/13-send-ready.png)
+
+The destination comes from `MAASSPEC_NOCTORNAL_URL`. Each spectrum goes in its own request with its
+analysis id as the Idempotency-Key.
+
+![Sent](docs/images/14-send-accepted.png)
+
+Sent: batch id and accepted, per spectrum.
+
+![A rejection](docs/images/15-send-rejected.png)
+
+A rejection stops the run. Rows after it are not sent.
+
+![Resend](docs/images/16-send-resend-duplicates.png)
+
+Sending the same spectra again is reported as duplicates, because a feed record's Idempotency-Key is
+derived from the record.
+
+### Themes and phones
+
+![Light theme](docs/images/17-light-theme.png)
+
+Light theme.
+
+![Phone width](docs/images/18-phone.png)
+
+Phone width.
 
 ## Not in this tree
 
@@ -33,6 +126,7 @@ src/maasspec/stream.py            bounded input, JSON Lines spectrum streams
 src/maasspec/serve.py             loopback web API for the UI
 ui/design/                        exported design source (reference)
 ui/app/                           the web UI (React, Vite, Tailwind)
+docs/images/                      README screenshots
 tests/                            synthetic fixtures only, no live calls
 ```
 
