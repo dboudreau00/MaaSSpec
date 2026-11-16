@@ -32,7 +32,7 @@ MAX_NETWORK_PER_KIND = 200
 
 class CapeModule(Module):
     name = "cape"
-    version = "0.1.0"
+    version = "0.3.1"
 
     def accepts(self, ctx: AnalysisContext) -> bool:
         return ctx.input_type == "cape_report"

@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 DEFAULT_MAX_BYTES = 64 * 1024 * 1024
-USER_AGENT = "maasspec/0.1.0"
+USER_AGENT = "maasspec/0.3.1"
 
 Opener = Callable[[urllib.request.Request, float], Any]
 

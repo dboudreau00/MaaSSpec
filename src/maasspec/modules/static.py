@@ -19,7 +19,7 @@ MAX_ZIP_UNCOMPRESSED = 64 * 1024 * 1024
 
 class StaticModule(Module):
     name = "static"
-    version = "0.1.0"
+    version = "0.3.1"
 
     def accepts(self, ctx: AnalysisContext) -> bool:
         return ctx.input_type != "cape_report"

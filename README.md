@@ -8,7 +8,7 @@ the graph, and the custody chain. MaaSSpec does not.
 
 ![Spectra list with feed records, samples, an archive, and a CAPE report](docs/images/01-spectra.png)
 
-**0.1.0 is the framework.** The static scan, the spectrum schema, the CAPE normalizer (including CAPE's
+**0.3.1 is the framework.** The static scan, the spectrum schema, the CAPE normalizer (including CAPE's
 own parser output), three public-feed adapters (MalwareBazaar, ThreatFox, UnpacMe), the NocTORnal ingest
 client, a local web UI, and the family-plugin contract run. The only family module is a synthetic marker
 used to prove that contract. It does not identify a real family.

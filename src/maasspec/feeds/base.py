@@ -46,7 +46,7 @@ class FetchOptions:
 class FeedAdapter:
     feed = "feed"
     name = "feed.base"
-    version = "0.1.0"
+    version = "0.3.1"
     hosts: frozenset[str] = frozenset()
     queries: ClassVar[dict[str, str]] = {}
     needs_key = True

@@ -242,4 +242,4 @@ in `100.64.0.0/10`, is not routable: it is tagged `scope:private` and scored 0.3
 
 Case management. Interactive reversing. A sandbox. OSINT collection beyond
 the three named feeds. Identity resolution. Shipping a real family decryptor
-inside 0.1.0. Downloading samples from any feed, or uploading to one.
+inside 0.3.1. Downloading samples from any feed, or uploading to one.
