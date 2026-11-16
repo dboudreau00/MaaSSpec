@@ -1,0 +1,82 @@
+@import 'tailwindcss';
+
+/* MaaSSpec theme. Keep identical across the prototype and every frame. */
+@theme inline {
+  --color-bg: var(--mx-bg);
+  --color-panel: var(--mx-panel);
+  --color-raised: var(--mx-raised);
+  --color-line: var(--mx-line);
+  --color-line-strong: var(--mx-line-strong);
+  --color-fg: var(--mx-fg);
+  --color-muted: var(--mx-muted);
+  --color-faint: var(--mx-faint);
+  --color-accent: var(--mx-accent);
+  --color-accent-soft: var(--mx-accent-soft);
+  --color-on-accent: var(--mx-on-accent);
+  --color-warn: var(--mx-warn);
+  --color-warn-soft: var(--mx-warn-soft);
+  --color-err: var(--mx-err);
+  --color-err-soft: var(--mx-err-soft);
+  --color-ok: var(--mx-ok);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+:root,
+.theme-dark {
+  --mx-bg: #151719;
+  --mx-panel: #1b1e21;
+  --mx-raised: #23272b;
+  --mx-line: #2b3035;
+  --mx-line-strong: #3b4248;
+  --mx-fg: #dadee2;
+  --mx-muted: #9ba3ab;
+  --mx-faint: #79818a;
+  --mx-accent: #7cb6a6;
+  --mx-accent-soft: rgba(124, 182, 166, 0.13);
+  --mx-on-accent: #0e1513;
+  --mx-warn: #d8a648;
+  --mx-warn-soft: rgba(216, 166, 72, 0.12);
+  --mx-err: #e26d66;
+  --mx-err-soft: rgba(226, 109, 102, 0.12);
+  --mx-ok: #93c083;
+  color-scheme: dark;
+}
+
+.theme-light {
+  --mx-bg: #f3f4f5;
+  --mx-panel: #ffffff;
+  --mx-raised: #eceef0;
+  --mx-line: #dde0e3;
+  --mx-line-strong: #c4c9ce;
+  --mx-fg: #1c2024;
+  --mx-muted: #59626b;
+  --mx-faint: #6b747d;
+  --mx-accent: #2f7a68;
+  --mx-accent-soft: rgba(47, 122, 104, 0.1);
+  --mx-on-accent: #ffffff;
+  --mx-warn: #94620a;
+  --mx-warn-soft: rgba(176, 120, 18, 0.1);
+  --mx-err: #b93a33;
+  --mx-err-soft: rgba(185, 58, 51, 0.08);
+  --mx-ok: #3d7a2e;
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-size: 13px;
+  background: var(--mx-bg);
+  color: var(--mx-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

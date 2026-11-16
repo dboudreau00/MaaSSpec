@@ -8,7 +8,7 @@ the graph, and the custody chain. MaaSSpec does not.
 
 **0.1.0 is the framework.** The static scan, the spectrum schema, the CAPE normalizer (including CAPE's
 own parser output), three public-feed adapters (MalwareBazaar, ThreatFox, UnpacMe), the NocTORnal ingest
-client, and the family-plugin contract run. The only family module is a synthetic marker
+client, a local web UI, and the family-plugin contract run. The only family module is a synthetic marker
 used to prove that contract. It does not identify a real family.
 
 ## Not in this tree
@@ -30,6 +30,9 @@ src/maasspec/modules/             static scan, CAPE normalizer and CAPE configs,
 src/maasspec/feeds/               MalwareBazaar, ThreatFox, UnpacMe adapters
 src/maasspec/ingest/noctornal.py  raw-bytes POST to NocTORnal
 src/maasspec/stream.py            bounded input, JSON Lines spectrum streams
+src/maasspec/serve.py             loopback web API for the UI
+ui/design/                        exported design source (reference)
+ui/app/                           the web UI (React, Vite, Tailwind)
 tests/                            synthetic fixtures only, no live calls
 ```
 
@@ -93,6 +96,23 @@ its ingest queue for a person to triage.
 section that CAPE's configuration parsers fill. Write custom extractors as CAPE parsers (`custom/parsers/`
 on the CAPE host); their `CAPE.configs` output becomes C2, key, and identifier findings capped at 0.6.
 See `SPEC.md`.
+
+## Web UI
+
+A local review console: open or analyze spectra, read findings with their provenance and grade, pivot on
+selectors, fetch and import feeds, and send spectra to NocTORnal. It runs on your machine only and does
+not execute, download, or render a sample.
+
+```bash
+npm --prefix ui/app install --ignore-scripts      # once; needs Node 20+
+npm --prefix ui/app run build
+python -m maasspec serve                          # prints http://127.0.0.1:8787/#t=<token>
+```
+
+Open the printed URL. The token in the fragment is required for every API call and changes on each run.
+Keys stay in the environment of the `serve` process (`MAASSPEC_ABUSECH_KEY`, `MAASSPEC_NOCTORNAL_URL`,
+`MAASSPEC_INGEST_KEY`); the browser only learns whether each is set. Spectra live in the server's memory
+for the session. Review marks live in the browser only.
 
 ## Next module
 
