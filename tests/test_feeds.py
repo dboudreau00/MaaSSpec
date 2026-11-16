@@ -146,7 +146,7 @@ UP_FEED = {
 
 def _spectra(adapter, payload, **kwargs) -> list[Spectrum]:
     data = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
-    return list(spectra_from_feed(adapter, data, now=STAMP, **kwargs))
+    return list(spectra_from_feed(adapter, data, **kwargs))
 
 
 def _kinds(spectrum: Spectrum) -> set[tuple[str, str | None]]:
@@ -181,14 +181,33 @@ def test_malwarebazaar_api_record_becomes_a_claim_spectrum() -> None:
 
 def test_the_same_record_gets_the_same_analysis_id() -> None:
     [first] = _spectra(MalwareBazaarFeed(), MB_RESPONSE)
-    [second] = list(
-        spectra_from_feed(
-            MalwareBazaarFeed(),
-            json.dumps(MB_RESPONSE).encode(),
-            now=datetime(2027, 1, 1, tzinfo=UTC),
-        )
-    )
+    [second] = _spectra(MalwareBazaarFeed(), MB_RESPONSE)
     assert first.analysis_id == second.analysis_id
+
+
+def test_the_same_export_imported_twice_is_byte_identical(monkeypatch) -> None:
+    from maasspec import engine
+
+    first = [s.model_dump_json() for s in _spectra(MalwareBazaarFeed(), MB_RESPONSE)]
+
+    class Later(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2031, 5, 5, tzinfo=tz)
+
+    monkeypatch.setattr(engine, "datetime", Later)
+    second = [s.model_dump_json() for s in _spectra(MalwareBazaarFeed(), MB_RESPONSE)]
+    assert first == second
+
+
+def test_feed_timestamps_are_the_sighting_time_or_the_fixed_epoch() -> None:
+    [seen] = _spectra(MalwareBazaarFeed(), MB_RESPONSE)
+    assert seen.generated_at == datetime(2026, 11, 15, 10, 0, tzinfo=UTC)
+    assert {f.first_seen_in_analysis for f in seen.findings} == {seen.generated_at}
+    bare = {"query_status": "ok", "data": [{"sha256_hash": SHA_B}]}
+    [unseen] = _spectra(MalwareBazaarFeed(), bare)
+    assert unseen.generated_at == datetime(1970, 1, 1, tzinfo=UTC)
+    assert unseen.model_dump_json().count("1970-01-01T00:00:00Z") == 1 + len(unseen.findings)
 
 
 def test_malwarebazaar_error_status_is_refused() -> None:

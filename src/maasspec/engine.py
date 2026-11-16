@@ -31,6 +31,7 @@ from maasspec.modules.static import StaticModule
 from maasspec.scan import extract_strings, hash_file, read_scan_window
 
 MAX_REPORT_BYTES = 128 * 1024 * 1024
+FEED_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 def default_modules() -> list[Module]:
@@ -151,8 +152,6 @@ def canonical_record_bytes(record: dict) -> bytes:
 def spectrum_from_feed_record(
     adapter: FeedAdapter,
     record: dict,
-    *,
-    now: datetime | None = None,
 ) -> Spectrum:
     """One spectrum per feed record. The input is the record, not the sample.
 
@@ -162,8 +161,12 @@ def spectrum_from_feed_record(
     fetched file. The analysis id is derived from feed, adapter version, and
     record hash, so importing the same export twice sends the same
     Idempotency-Key.
+
+    The document is byte-stable too: `generated_at` and every finding's
+    `first_seen_in_analysis` are the record's own sighting time, or the fixed
+    epoch when the record carries none. They are not wall-clock.
     """
-    stamp = now or datetime.now(UTC)
+    stamp = adapter.sighting_time(record) or FEED_EPOCH
     canonical = canonical_record_bytes(record)
     record_sha = hashlib.sha256(canonical).hexdigest()
     result = _run_guarded(adapter.name, lambda: adapter.run(record))
@@ -210,12 +213,11 @@ def spectra_from_feed(
     data: bytes,
     *,
     limit: int = 1000,
-    now: datetime | None = None,
 ) -> Iterator[Spectrum]:
     for count, record in enumerate(adapter.records(data)):
         if count >= limit:
             return
-        yield spectrum_from_feed_record(adapter, record, now=now)
+        yield spectrum_from_feed_record(adapter, record)
 
 
 def _run_guarded(name: str, call) -> ModuleOutput:

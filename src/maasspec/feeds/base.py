@@ -14,6 +14,7 @@ import json
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from maasspec import net
@@ -59,6 +60,14 @@ class FeedAdapter:
     def sample_sha256(self, record: dict) -> str | None:
         return None
 
+    def sighting_time(self, record: dict) -> datetime | None:
+        """When the feed says it saw the record, in UTC. None when it does not say."""
+        for key in ("first_seen", "created"):
+            parsed = parse_time(record.get(key))
+            if parsed is not None:
+                return parsed
+        return None
+
     def run(self, record: dict) -> ModuleOutput:
         raise NotImplementedError
 
@@ -71,6 +80,18 @@ class FeedAdapter:
         opener: net.Opener | None = None,
     ) -> bytes:
         raise NotImplementedError
+
+
+def parse_time(value: Any) -> datetime | None:
+    cleaned = text(value, 64)
+    if cleaned is None:
+        return None
+    cleaned = cleaned.removesuffix("UTC").removesuffix("utc").strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(cleaned)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
 def decode(data: bytes) -> str:
