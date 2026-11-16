@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/
+spectra/
+graphify-out/
+.ruff_cache/
+.env
+ui/app/node_modules/
+ui/app/dist/
+ui/app/.vite/
